@@ -148,13 +148,32 @@
       const [isSubmitting, setIsSubmitting] = useState(false);
       const [isSubmitted, setIsSubmitted] = useState(false);
       const [errorMessage, setErrorMessage] = useState('');
+      const [isDesktop, setIsDesktop] = useState(() =>
+        typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
+      );
 
       useEffect(() => {
         const onKeyDown = (e) => {
           if (e.key === 'Escape') setIsModalOpen(false);
         };
         window.addEventListener('keydown', onKeyDown);
-        return () => window.removeEventListener('keydown', onKeyDown);
+
+        const mediaQuery = window.matchMedia('(min-width: 768px)');
+        const onMediaChange = (e) => setIsDesktop(e.matches);
+        if (mediaQuery.addEventListener) {
+          mediaQuery.addEventListener('change', onMediaChange);
+        } else if (mediaQuery.addListener) {
+          mediaQuery.addListener(onMediaChange);
+        }
+
+        return () => {
+          window.removeEventListener('keydown', onKeyDown);
+          if (mediaQuery.removeEventListener) {
+            mediaQuery.removeEventListener('change', onMediaChange);
+          } else if (mediaQuery.removeListener) {
+            mediaQuery.removeListener(onMediaChange);
+          }
+        };
       }, []);
 
       const openModalWithInput = (e) => {
@@ -277,12 +296,36 @@
         <div className="w-full">
           
           {/* ===================================================================
-              PANTALLAZO 1: COMPOSICIÓN MINIMALISTA ESTILO SOLEVE (100vh)
+              PANTALLAZO 1: COMPOSICIÓN MINIMALISTA ESTILO SOLEVE CON VIDEO SLIDER (100vh)
              =================================================================== */}
           <section className="soleve-canvas relative w-full h-screen min-h-[660px] flex flex-col justify-between px-8 sm:px-16 py-9 sm:py-12 overflow-hidden select-none">
             
+            {/* FONDO DE VIDEO SLIDER SEGÚN DISPOSITIVO (Descarga únicamente el video del dispositivo activo) */}
+            <div className="absolute inset-0 z-0 w-full h-full overflow-hidden pointer-events-none">
+              <video
+                key={isDesktop ? 'desktop-slider' : 'responsive-slider'}
+                ref={(el) => {
+                  if (el) {
+                    el.muted = true;
+                    el.defaultMuted = true;
+                    el.play().catch(() => {});
+                  }
+                }}
+                src={isDesktop ? 'Sliders/TeRespondo-Slide-Desktop.mp4' : 'Sliders/TeRespondo-Slide-Responsive.mp4'}
+                poster="assets/soleve_hero.jpg"
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="auto"
+                className="w-full h-full object-cover object-center"
+              />
+              {/* Sutil velo en extremos superior e inferior para mantener máxima legibilidad del logo, textos y botones */}
+              <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-black/30 pointer-events-none"></div>
+            </div>
+
             {/* HEADER MINIMALISTA */}
-            <header className="relative z-30 flex items-center justify-between w-full max-w-[1440px] mx-auto">
+            <header className="relative z-30 flex items-center justify-between w-full max-w-[1440px] mx-auto drop-shadow-sm">
               <a href="#" className="flex items-center gap-2.5">
                 <img src="assets/logo.png" alt="TeRespondo" className="w-7 h-7 object-contain brightness-0 invert opacity-95" />
                 <span className="text-2xl sm:text-[32px] font-black tracking-tight text-white">
@@ -303,39 +346,15 @@
               </div>
             </header>
 
-            {/* CENTRO: TEXTO MONUMENTAL + VISUAL DEL CELULAR MARKETPLACE CON CAPA INTERMEDIA */}
-            <div className="relative flex-1 flex items-center justify-center w-full max-w-[1440px] mx-auto">
-              
-              {/* Capa 1 (Detrás del celular): Texto blanco sólido */}
-              <div aria-hidden="true" className="relative z-10 text-[12vw] xl:text-[164px] font-bold tracking-tight leading-none text-white whitespace-nowrap pointer-events-none">
-                <span>En 2 </span>
-                <span className="opacity-0">Seg</span>
-                <span>undos</span>
-              </div>
-
-              {/* Capa 2 (En medio): El celular con Marketplace y el aro luminoso estilo Soleve */}
-              <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                <img 
-                  src="assets/soleve_hero.jpg?v=2" 
-                  onError={(e) => { e.currentTarget.src = 'assets/hero_editorial.png'; }}
-                  alt="TeRespondo Marketplace Auto-Reply" 
-                  className="w-[680px] sm:w-[860px] md:w-[1020px] max-w-none h-[440px] sm:h-[560px] md:h-[640px] object-cover object-center hero-subject-mask"
-                />
-              </div>
-
-              {/* Capa 3 (Delante del celular): Contorno traslúcido */}
-              <h1 className="absolute inset-0 flex items-center justify-center z-30 text-[12vw] xl:text-[164px] font-bold tracking-tight leading-none whitespace-nowrap pointer-events-none">
-                <span className="opacity-0">En 2 </span>
-                <span className="giant-word-outline">Seg</span>
-                <span className="opacity-0">undos</span>
-              </h1>
-
+            {/* ESPACIO CENTRAL (El video ya incluye la animación 3D del celular y "En 2 Segundos") */}
+            <div className="relative flex-1 flex items-center justify-center w-full max-w-[1440px] mx-auto pointer-events-none">
+              <h1 className="sr-only">En 2 Segundos</h1>
             </div>
 
             {/* FOOTER DEL PRIMER PANTALLAZO */}
             <div className="relative z-30 w-full max-w-[1440px] mx-auto flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
               
-              <div className="flex items-center gap-2.5 text-xs sm:text-sm text-white/95 font-normal">
+              <div className="flex items-center gap-2.5 text-xs sm:text-sm text-white/95 font-normal drop-shadow-sm">
                 <svg className="w-4 h-4 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <circle cx="12" cy="12" r="10" strokeWidth="1.6"/>
                   <line x1="2" y1="12" x2="22" y2="12" strokeWidth="1.6"/>
@@ -345,17 +364,17 @@
               </div>
 
               <div className="w-full md:w-[390px] space-y-4 select-text">
-                <p className="text-xs sm:text-[13px] text-white/90 font-normal leading-relaxed">
+                <p className="text-xs sm:text-[13px] text-white/95 font-normal leading-relaxed drop-shadow-sm">
                   Prepárate para no volver a perder un cliente en Marketplace. Detectamos por cuál de tus anuncios preguntan, respondemos en 2 segundos y pasamos la venta directo a tu WhatsApp.
                 </p>
 
-                <form onSubmit={openModalWithInput} className="soleve-input-shell rounded-full p-1 flex items-center">
+                <form onSubmit={openModalWithInput} className="soleve-input-shell rounded-full p-1 flex items-center shadow-lg">
                   <input
                     type="text"
                     value={quickInput}
                     onChange={(e) => setQuickInput(e.target.value)}
                     placeholder="WhatsApp o Email"
-                    className="w-full bg-transparent text-white placeholder-white/65 text-xs sm:text-[13px] px-4 py-2 focus:outline-none"
+                    className="w-full bg-transparent text-white placeholder-white/75 text-xs sm:text-[13px] px-4 py-2 focus:outline-none"
                   />
                   <button
                     type="submit"

@@ -41,7 +41,9 @@ const MIME_TYPES = {
   '.jpeg': 'image/jpeg',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
-  '.webp': 'image/webp'
+  '.webp': 'image/webp',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm'
 };
 
 // Formateador de fecha en hora oficial de Lima, Perú: "DD/MM/YYYY HH:mm"
@@ -202,6 +204,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   let filePath = path.join(PUBLIC_DIR, safePath);
+  if (!fs.existsSync(filePath)) {
+    const rootFallback = path.join(__dirname, safePath);
+    if (fs.existsSync(rootFallback)) {
+      filePath = rootFallback;
+    }
+  }
 
   fs.stat(filePath, (err, stats) => {
     if (err || stats.isDirectory()) {
@@ -210,6 +218,50 @@ const server = http.createServer(async (req, res) => {
 
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+
+    // Soporte de streaming, caché y HTTP Range (206 Partial Content) para videos MP4/WebM
+    if ((ext === '.mp4' || ext === '.webm') && stats && !stats.isDirectory()) {
+      const range = req.headers.range;
+      const total = stats.size;
+      const cacheHeader = 'public, max-age=86400';
+
+      if (range) {
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : total - 1;
+        if (isNaN(start) || isNaN(end) || start >= total || end >= total || start > end) {
+          res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+          res.end();
+          return;
+        }
+        res.writeHead(206, {
+          'Content-Range': `bytes ${start}-${end}/${total}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': (end - start) + 1,
+          'Content-Type': contentType,
+          'Cache-Control': cacheHeader
+        });
+        const stream = fs.createReadStream(filePath, { start, end });
+        stream.on('error', () => res.end());
+        res.on('close', () => stream.destroy());
+        stream.pipe(res);
+      } else {
+        res.writeHead(200, {
+          'Content-Length': total,
+          'Accept-Ranges': 'bytes',
+          'Content-Type': contentType,
+          'Cache-Control': cacheHeader
+        });
+        const stream = fs.createReadStream(filePath);
+        stream.on('error', () => res.end());
+        res.on('close', () => stream.destroy());
+        stream.pipe(res);
+      }
+      return;
+    }
+
+    const isMediaAsset = ['.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico'].includes(ext);
+    const cacheControl = isMediaAsset ? 'public, max-age=86400' : 'no-cache';
 
     fs.readFile(filePath, (readErr, content) => {
       if (readErr) {
@@ -222,15 +274,19 @@ const server = http.createServer(async (req, res) => {
       if (acceptEncoding.includes('gzip') && (ext === '.html' || ext === '.js' || ext === '.css')) {
         zlib.gzip(content, (gzipErr, compressed) => {
           if (gzipErr) {
-            res.writeHead(200, { 'Content-Type': contentType });
+            res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': cacheControl });
             res.end(content);
             return;
           }
-          res.writeHead(200, { 'Content-Type': contentType, 'Content-Encoding': 'gzip' });
+          res.writeHead(200, {
+            'Content-Type': contentType,
+            'Content-Encoding': 'gzip',
+            'Cache-Control': cacheControl
+          });
           res.end(compressed);
         });
       } else {
-        res.writeHead(200, { 'Content-Type': contentType });
+        res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': cacheControl });
         res.end(content);
       }
     });
