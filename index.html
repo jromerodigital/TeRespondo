@@ -331,6 +331,10 @@
                 <span className="text-2xl sm:text-[32px] font-black tracking-tight text-white">
                   TeRespondo<sup className="text-xs font-normal text-white/70 ml-0.5">®</sup>
                 </span>
+                <span className="ml-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-[10px] font-black tracking-widest uppercase text-white shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#16B8B0] animate-pulse"></span>
+                  Waitlist
+                </span>
               </a>
 
               <div className="flex items-center gap-7 sm:gap-10 text-white/90">
@@ -352,10 +356,10 @@
             </div>
 
             {/* FOOTER DEL PRIMER PANTALLAZO */}
-            <div className="relative z-30 w-full max-w-[1440px] mx-auto flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
+            <div className="relative z-30 w-full max-w-[1440px] mx-auto flex flex-col md:flex-row items-start md:items-end justify-between gap-6 pb-2 sm:pb-0">
               
-              <div className="flex items-center gap-2.5 text-xs sm:text-sm text-white/95 font-normal drop-shadow-sm">
-                <svg className="w-4 h-4 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/30 backdrop-blur-md border border-white/20 text-xs sm:text-sm text-white/95 font-medium shadow-lg">
+                <svg className="w-4 h-4 text-[#16B8B0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <circle cx="12" cy="12" r="10" strokeWidth="1.6"/>
                   <line x1="2" y1="12" x2="22" y2="12" strokeWidth="1.6"/>
                   <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" strokeWidth="1.6"/>
@@ -363,22 +367,34 @@
                 <span>Facebook Marketplace — Android</span>
               </div>
 
-              <div className="w-full md:w-[390px] space-y-4 select-text">
-                <p className="text-xs sm:text-[13px] text-white/95 font-normal leading-relaxed drop-shadow-sm">
-                  Prepárate para no volver a perder un cliente en Marketplace. Detectamos por cuál de tus anuncios preguntan, respondemos en 2 segundos y pasamos la venta directo a tu WhatsApp.
+              {/* CARD FROSTED GLASS CON TAG WAITLIST Y TEXTO OPTIMIZADO PARA MÁXIMO CONTRASTE UX/UI */}
+              <div className="w-full md:w-[420px] bg-black/40 md:bg-black/30 backdrop-blur-xl border border-white/20 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-3.5 select-text">
+                
+                <div className="flex items-center justify-between">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 border border-white/20 text-[10px] font-black tracking-widest uppercase text-white/95">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#16B8B0]"></span>
+                    <span>Waitlist Abierta</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-[#16B8B0] uppercase tracking-wider">
+                    Acceso VIP
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-[13px] text-white/90 font-normal leading-relaxed">
+                  Prepárate para <strong className="text-white font-bold">no volver a perder un cliente</strong> en Marketplace. Detectamos por cuál de tus anuncios preguntan, <strong className="text-[#16B8B0] font-bold">respondemos en 2 segundos</strong> y pasamos la venta directo a tu WhatsApp.
                 </p>
 
-                <form onSubmit={openModalWithInput} className="soleve-input-shell rounded-full p-1 flex items-center shadow-lg">
+                <form onSubmit={openModalWithInput} className="soleve-input-shell rounded-full p-1 flex items-center shadow-lg bg-white/15 border-white/30">
                   <input
                     type="text"
                     value={quickInput}
                     onChange={(e) => setQuickInput(e.target.value)}
                     placeholder="WhatsApp o Email"
-                    className="w-full bg-transparent text-white placeholder-white/75 text-xs sm:text-[13px] px-4 py-2 focus:outline-none"
+                    className="w-full bg-transparent text-white placeholder-white/70 text-xs sm:text-[13px] px-4 py-2 focus:outline-none"
                   />
                   <button
                     type="submit"
-                    className="shrink-0 bg-[#0A0D12] hover:bg-[#163A5F] text-white text-xs sm:text-[13px] font-bold px-6 py-2.5 rounded-full transition cursor-pointer"
+                    className="shrink-0 bg-[#0A0D12] hover:bg-[#163A5F] text-white text-xs sm:text-[13px] font-bold px-6 py-2.5 rounded-full transition cursor-pointer shadow"
                   >
                     Acceso VIP
                   </button>
