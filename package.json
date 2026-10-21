@@ -4,6 +4,7 @@
   "description": "Landing Page Oficial TeRespondo - Early Access & Waitlist",
   "main": "server.js",
   "scripts": {
+    "build": "node -e \"const fs=require('fs'); fs.cpSync('public', 'dist', {recursive: true}); console.log('Build ready in public/ and dist/');\"",
     "start": "node server.js",
     "dev": "node server.js"
   },
