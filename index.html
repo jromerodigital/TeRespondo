@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TeRespondo — Tus ventas de Marketplace en 2 segundos</title>
+  <meta name="description" content="Asistente inteligente para Facebook Marketplace en Android. Responde cada anuncio en 2 segundos y captura el WhatsApp de tus clientes.">
+  
+  <link rel="icon" type="image/png" href="assets/logo.png">
+
+  <!-- Google Fonts: Lato -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Lato"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Lato', sans-serif;
+      background-color: #6E8D9E;
+      color: #FFFFFF;
+      overflow-x: hidden;
+    }
+
+    /* Fondo idéntico al tono atmosférico de Soleve y fundido con soleve_hero.jpg */
+    .soleve-canvas {
+      background: 
+        radial-gradient(circle at 50% 42%, rgba(138, 172, 190, 0.55) 0%, rgba(105, 137, 155, 0.35) 45%, transparent 75%),
+        linear-gradient(115deg, #587588 0%, #7190A1 50%, #8CA7B6 100%);
+    }
+
+    /* Máscara elíptica para que el sujeto central se funda sin costuras en el lienzo */
+    .hero-subject-mask {
+      -webkit-mask-image: radial-gradient(ellipse 46% 68% at 50% 50%, #000 52%, transparent 96%);
+      mask-image: radial-gradient(ellipse 46% 68% at 50% 50%, #000 52%, transparent 96%);
+    }
+
+    /* Letras centrales en contorno traslúcido superpuestas al sujeto (efecto Soleve) */
+    .giant-word-outline {
+      -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.42);
+      color: transparent;
+    }
+
+    /* Barra de suscripción traslúcida estilo Soleve */
+    .soleve-input-shell {
+      background: rgba(255, 255, 255, 0.20);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.38);
+    }
+
+    /* Chasis realista Samsung Galaxy S24 Ultra (esquinas rectas características + marco titanio) */
+    .s24-ultra-frame {
+      background: linear-gradient(145deg, #3A3F47 0%, #1E2229 50%, #2C313A 100%);
+      border-radius: 18px;
+      padding: 7px;
+      box-shadow: 
+        0 25px 50px -12px rgba(22, 58, 95, 0.22),
+        0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+    }
+    .s24-ultra-screen {
+      border-radius: 12px;
+      overflow: hidden;
+      background: #FFFFFF;
+    }
+  </style>
+</head>
+<body class="antialiased selection:bg-[#16B8B0] selection:text-white">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const SUPABASE_FALLBACK = {
+      url: "https://yfkhtxwhdsdbztnrrqiv.supabase.co",
+      anonKey: "sb_publishable_UbUlPOZONHDLxYDNWtgz_A_36DRqzNc",
+      tableName: "waitlist_leads"
+    };
+
+    function formatLimaDateTime(date = new Date()) {
+      const parts = new Intl.DateTimeFormat('es-PE', {
+        timeZone: 'America/Lima',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).formatToParts(date);
+      const map = {};
+      parts.forEach((p) => { map[p.type] = p.value; });
+      return `${map.day}/${map.month}/${map.year} ${map.hour}:${map.minute}`;
+    }
+
+    const RUBROS = {
+      inmuebles: {
+        label: '🏢 Inmuebles',
+        ad: 'Departamento en Magdalena',
+        msg: '¿Sigue disponible? ¿Aceptan financiamiento?',
+        reply: '¡Hola Luis! 👋 Sí, sigue disponible con crédito directo. Pásame tu WhatsApp para enviarte planos.',
+        lead: '994 310 822'
+      },
+      calzado: {
+        label: '👟 Calzado',
+        ad: 'Adidas Superstar Pokémon • S/ 399',
+        msg: '¿Sigue disponible en talla 42?',
+        reply: '¡Hola! Sí, las Adidas Superstar Pokémon (S/ 399) están disponibles en talla 42. Pásame tu WhatsApp para enviarte fotos reales.',
+        lead: '987 654 321'
+      },
+      vehiculos: {
+        label: '🚗 Vehículos',
+        ad: 'Toyota Corolla 2023 • $23,500',
+        msg: '¿Sigue disponible? ¿Kilometraje real?',
+        reply: 'Disponible, 18,400 km reales. Pásame tu WhatsApp para enviarte placa y ubicación.',
+        lead: '945 112 789'
+      }
+    };
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('inmuebles');
+      const [isModalOpen, setIsModalOpen] = useState(false);
+      const [quickInput, setQuickInput] = useState('');
+
+      const [formData, setFormData] = useState({
+        fullName: '',
+        phone: '',
+        email: '',
+        serviceType: '',
+        dailyMessages: 'Entre 10 y 50 al día'
+      });
+
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [isSubmitted, setIsSubmitted] = useState(false);
+      const [errorMessage, setErrorMessage] = useState('');
+
+      useEffect(() => {
+        const onKeyDown = (e) => {
+          if (e.key === 'Escape') setIsModalOpen(false);
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+      }, []);
+
+      const openModalWithInput = (e) => {
+        if (e) e.preventDefault();
+        if (quickInput.trim()) {
+          const val = quickInput.trim();
+          if (val.includes('@')) {
+            setFormData(prev => ({ ...prev, email: val }));
+          } else {
+            setFormData(prev => ({ ...prev, phone: val }));
+          }
+        }
+        setIsModalOpen(true);
+      };
+
+      const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+        if (errorMessage) setErrorMessage('');
+      };
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!formData.fullName.trim() || !formData.phone.trim() || !formData.email.trim() || !formData.serviceType) {
+          setErrorMessage('Completa todos los campos para reservar tu cupo.');
+          return;
+        }
+
+        setIsSubmitting(true);
+        setErrorMessage('');
+
+        try {
+          const cleanName = formData.fullName.trim();
+          const cleanPhone = formData.phone.trim();
+          const cleanEmail = formData.email.trim().toLowerCase();
+
+          // 1. Intentar vía servidor Node/Railway (/api/lead)
+          let registeredViaServer = false;
+          try {
+            const serverRes = await fetch('/api/lead', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fullName: cleanName,
+                phone: cleanPhone,
+                email: cleanEmail,
+                serviceType: formData.serviceType,
+                dailyMessages: formData.dailyMessages
+              })
+            });
+            if (serverRes.ok) {
+              registeredViaServer = true;
+            }
+          } catch (_) {}
+
+          // 2. Si corre en GitHub Pages (estático sin servidor Node), registrar directo en Supabase
+          if (!registeredViaServer) {
+            const fechaLima = formatLimaDateTime(new Date());
+            const digitsOnly = cleanPhone.replace(/\D/g, '');
+            const tempPassword = digitsOnly.length >= 6 ? digitsOnly : `${cleanPhone}TR2026`;
+
+            const authReq = fetch(`${SUPABASE_FALLBACK.url}/auth/v1/signup`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_FALLBACK.anonKey,
+                'Authorization': `Bearer ${SUPABASE_FALLBACK.anonKey}`
+              },
+              body: JSON.stringify({
+                email: cleanEmail,
+                password: tempPassword,
+                data: {
+                  full_name: cleanName,
+                  phone: cleanPhone,
+                  service_type: formData.serviceType,
+                  daily_messages: formData.dailyMessages,
+                  status: 'pending',
+                  fecha_registro_lima: fechaLima
+                }
+              })
+            }).catch(() => ({ ok: false }));
+
+            const leadReq = fetch(`${SUPABASE_FALLBACK.url}/rest/v1/${SUPABASE_FALLBACK.tableName}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_FALLBACK.anonKey,
+                'Authorization': `Bearer ${SUPABASE_FALLBACK.anonKey}`,
+                'Prefer': 'return=minimal'
+              },
+              body: JSON.stringify({
+                full_name: cleanName,
+                phone: cleanPhone,
+                email: cleanEmail,
+                service_type: formData.serviceType,
+                daily_messages: formData.dailyMessages,
+                fecha_registro_lima: fechaLima,
+                status: 'pending'
+              })
+            }).catch(() => ({ ok: false }));
+
+            const [authRes, leadRes] = await Promise.all([authReq, leadReq]);
+            if (!authRes.ok && !leadRes.ok) {
+              throw new Error('Error al registrar');
+            }
+          }
+
+          setIsSubmitted(true);
+        } catch (err) {
+          console.error(err);
+          setErrorMessage('Hubo un problema al guardar. Intenta de nuevo.');
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      const currentRubro = RUBROS[activeTab];
+
+      return (
+        <div className="w-full">
+          
+          {/* ===================================================================
+              PANTALLAZO 1: COMPOSICIÓN MINIMALISTA ESTILO SOLEVE (100vh)
+             =================================================================== */}
+          <section className="soleve-canvas relative w-full h-screen min-h-[660px] flex flex-col justify-between px-8 sm:px-16 py-9 sm:py-12 overflow-hidden select-none">
+            
+            {/* HEADER MINIMALISTA */}
+            <header className="relative z-30 flex items-center justify-between w-full max-w-[1440px] mx-auto">
+              <a href="#" className="flex items-center gap-2.5">
+                <img src="assets/logo.png" alt="TeRespondo" className="w-7 h-7 object-contain brightness-0 invert opacity-95" />
+                <span className="text-2xl sm:text-[32px] font-black tracking-tight text-white">
+                  TeRespondo<sup className="text-xs font-normal text-white/70 ml-0.5">®</sup>
+                </span>
+              </a>
+
+              <div className="flex items-center gap-7 sm:gap-10 text-white/90">
+                <span className="text-xs sm:text-sm font-normal tracking-wide">©2026</span>
+                <a 
+                  href="#beneficios" 
+                  title="Ver beneficios"
+                  className="group flex flex-col gap-1.5 py-2 cursor-pointer"
+                >
+                  <span className="w-9 h-[1.5px] bg-white transition-all group-hover:w-11"></span>
+                  <span className="w-9 h-[1.5px] bg-white/80 transition-all group-hover:w-7 ml-auto"></span>
+                </a>
+              </div>
+            </header>
+
+            {/* CENTRO: TEXTO MONUMENTAL + VISUAL DEL CELULAR MARKETPLACE CON CAPA INTERMEDIA */}
+            <div className="relative flex-1 flex items-center justify-center w-full max-w-[1440px] mx-auto">
+              
+              {/* Capa 1 (Detrás del celular): Texto blanco sólido */}
+              <div aria-hidden="true" className="relative z-10 text-[12vw] xl:text-[164px] font-bold tracking-tight leading-none text-white whitespace-nowrap pointer-events-none">
+                <span>En 2 </span>
+                <span className="opacity-0">Seg</span>
+                <span>undos</span>
+              </div>
+
+              {/* Capa 2 (En medio): El celular con Marketplace y el aro luminoso estilo Soleve */}
+              <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                <img 
+                  src="assets/soleve_hero.jpg?v=2" 
+                  onError={(e) => { e.currentTarget.src = 'assets/hero_editorial.png'; }}
+                  alt="TeRespondo Marketplace Auto-Reply" 
+                  className="w-[680px] sm:w-[860px] md:w-[1020px] max-w-none h-[440px] sm:h-[560px] md:h-[640px] object-cover object-center hero-subject-mask"
+                />
+              </div>
+
+              {/* Capa 3 (Delante del celular): Contorno traslúcido */}
+              <h1 className="absolute inset-0 flex items-center justify-center z-30 text-[12vw] xl:text-[164px] font-bold tracking-tight leading-none whitespace-nowrap pointer-events-none">
+                <span className="opacity-0">En 2 </span>
+                <span className="giant-word-outline">Seg</span>
+                <span className="opacity-0">undos</span>
+              </h1>
+
+            </div>
+
+            {/* FOOTER DEL PRIMER PANTALLAZO */}
+            <div className="relative z-30 w-full max-w-[1440px] mx-auto flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
+              
+              <div className="flex items-center gap-2.5 text-xs sm:text-sm text-white/95 font-normal">
+                <svg className="w-4 h-4 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10" strokeWidth="1.6"/>
+                  <line x1="2" y1="12" x2="22" y2="12" strokeWidth="1.6"/>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" strokeWidth="1.6"/>
+                </svg>
+                <span>Facebook Marketplace — Android</span>
+              </div>
+
+              <div className="w-full md:w-[390px] space-y-4 select-text">
+                <p className="text-xs sm:text-[13px] text-white/90 font-normal leading-relaxed">
+                  Prepárate para no volver a perder un cliente en Marketplace. Detectamos por cuál de tus anuncios preguntan, respondemos en 2 segundos y pasamos la venta directo a tu WhatsApp.
+                </p>
+
+                <form onSubmit={openModalWithInput} className="soleve-input-shell rounded-full p-1 flex items-center">
+                  <input
+                    type="text"
+                    value={quickInput}
+                    onChange={(e) => setQuickInput(e.target.value)}
+                    placeholder="WhatsApp o Email"
+                    className="w-full bg-transparent text-white placeholder-white/65 text-xs sm:text-[13px] px-4 py-2 focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="shrink-0 bg-[#0A0D12] hover:bg-[#163A5F] text-white text-xs sm:text-[13px] font-bold px-6 py-2.5 rounded-full transition cursor-pointer"
+                  >
+                    Acceso VIP
+                  </button>
+                </form>
+              </div>
+
+            </div>
+
+          </section>
+
+          {/* ===================================================================
+              PANTALLAZO 2: GALAXY S24 ULTRA (PROBLEMA REAL) + BENEFICIOS (100vh)
+             =================================================================== */}
+          <section id="beneficios" className="min-h-screen w-full bg-[#F5F8FA] text-[#163A5F] flex flex-col justify-between px-8 sm:px-16 py-10 sm:py-12">
+            
+            <div className="max-w-6xl w-full mx-auto my-auto grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+              
+              {/* COLUMNA IZQUIERDA: SAMSUNG GALAXY S24 ULTRA CON CAPTURA REAL DE MARKETPLACE */}
+              <div className="lg:col-span-5 flex flex-col items-center justify-center relative">
+                
+                {/* Chasis Galaxy S24 Ultra */}
+                <div className="relative w-[260px] sm:w-[285px] s24-ultra-frame">
+                  
+                  {/* Botones laterales físicos del S24 Ultra */}
+                  <div className="absolute -right-[3px] top-24 w-[3px] h-12 bg-[#4A505A] rounded-r"></div>
+                  <div className="absolute -right-[3px] top-40 w-[3px] h-7 bg-[#4A505A] rounded-r"></div>
+
+                  {/* Pantalla con punch-hole superior */}
+                  <div className="s24-ultra-screen relative">
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-black z-20"></div>
+                    <img 
+                      src="assets/marketplace_s24.png" 
+                      alt="Bandeja real de Facebook Marketplace en Galaxy S24 Ultra" 
+                      className="w-full h-auto block select-none"
+                    />
+                  </div>
+
+                  {/* Callout Minimalista 1: El dolor (mensajes sin responder) */}
+                  <div className="hidden sm:flex items-center gap-2 absolute -left-12 top-[22%] bg-white text-[#252A34] px-3.5 py-2 rounded-2xl shadow-lg border border-red-200 text-xs font-bold">
+                    <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                    <span>Sin bot: <strong>13 chats</strong> sin responder</span>
+                  </div>
+
+                  {/* Callout Minimalista 2: La solución en vivo (respuesta por anuncio) */}
+                  <div className="hidden sm:flex items-center gap-2 absolute -right-10 top-[36%] bg-[#163A5F] text-white px-3.5 py-2 rounded-2xl shadow-lg border border-[#16B8B0]/40 text-xs font-bold">
+                    <span className="w-2 h-2 rounded-full bg-[#16B8B0] animate-ping"></span>
+                    <span>TeRespondo: contesta cada anuncio en 2s</span>
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* COLUMNA DERECHA: SIMULADOR MINIMALISTA + 4 BENEFICIOS + CTA */}
+              <div className="lg:col-span-7 space-y-7">
+                
+                {/* Cabecera corta */}
+                <div className="space-y-1.5 text-left">
+                  <span className="text-[11px] font-black uppercase tracking-widest text-[#16B8B0]">
+                    100% Nativo en tu Android • Cero Servidores
+                  </span>
+                  <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-[#163A5F] leading-tight">
+                    Sabe qué vendes. Contesta al instante.
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-500">
+                    No más clientes perdidos por tener 10 anuncios distintos y la bandeja llena.
+                  </p>
+                </div>
+
+                {/* Demo Interactiva Minimalista en 3 bloques cortos */}
+                <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80 space-y-4">
+                  
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      Simula un anuncio:
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {Object.entries(RUBROS).map(([key, item]) => (
+                        <button
+                          key={key}
+                          onClick={() => setActiveTab(key)}
+                          className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
+                            activeTab === key
+                              ? 'bg-[#163A5F] text-white'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-stretch">
+                    <div className="p-3.5 rounded-2xl bg-[#F5F8FA] flex flex-col justify-center">
+                      <div className="text-[10px] font-black uppercase text-slate-400 mb-1 truncate">
+                        1. {currentRubro.ad}
+                      </div>
+                      <div className="text-xs sm:text-sm font-bold text-[#252A34]">
+                        "{currentRubro.msg}"
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-[#163A5F] text-white flex flex-col justify-center">
+                      <div className="text-[10px] font-black uppercase text-[#16B8B0] mb-1">
+                        2. Respuesta en 1.8s
+                      </div>
+                      <div className="text-xs text-white/95 leading-snug">
+                        "{currentRubro.reply}"
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-[#16B8B0]/10 border border-[#16B8B0]/30 flex flex-col justify-center">
+                      <div className="text-[10px] font-black uppercase text-[#0F8A84] mb-1">
+                        3. WhatsApp Listo
+                      </div>
+                      <div className="text-xs sm:text-sm font-black text-[#163A5F]">
+                        📲 {currentRubro.lead}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4 Beneficios puntuales en 2x2 */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-white p-4 rounded-2xl border border-slate-200/70">
+                    <div className="text-[#16B8B0] font-black text-sm mb-0.5">01</div>
+                    <h3 className="font-black text-xs sm:text-sm text-[#163A5F]">Filtro por Anuncio</h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Distingue cada publicación.</p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-2xl border border-slate-200/70">
+                    <div className="text-[#16B8B0] font-black text-sm mb-0.5">02</div>
+                    <h3 className="font-black text-xs sm:text-sm text-[#163A5F]">Respuesta en 2s</h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Retardo humano anti-ban.</p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-2xl border border-slate-200/70">
+                    <div className="text-[#16B8B0] font-black text-sm mb-0.5">03</div>
+                    <h3 className="font-black text-xs sm:text-sm text-[#163A5F]">Captura WhatsApp</h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Extrae el celular en 1 toque.</p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-2xl border border-slate-200/70">
+                    <div className="text-[#16B8B0] font-black text-sm mb-0.5">04</div>
+                    <h3 className="font-black text-xs sm:text-sm text-[#163A5F]">100% Android</h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">$0 en servidores o APIs.</p>
+                  </div>
+                </div>
+
+                {/* Botón al Pop-up */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 pt-1">
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="inline-flex items-center justify-center gap-3 bg-[#0A0D12] hover:bg-[#163A5F] text-white font-bold text-sm px-8 py-3.5 rounded-full shadow-md transition-all cursor-pointer"
+                  >
+                    <span>Reservar mi Pase VIP Gratis</span>
+                    <span>→</span>
+                  </button>
+                  <span className="text-xs text-slate-400">
+                    Gratis para los primeros 100 fundadores
+                  </span>
+                </div>
+
+              </div>
+
+            </div>
+
+            <footer className="max-w-6xl w-full mx-auto pt-6 border-t border-slate-200/80 flex items-center justify-between text-xs text-slate-400">
+              <span>TeRespondo® — Tecnología que responde. Ventas que avanzan.</span>
+              <span>©2026</span>
+            </footer>
+
+          </section>
+
+          {/* ===================================================================
+              POP-UP MODAL (Formulario para dejar sus datos → Supabase)
+             =================================================================== */}
+          {isModalOpen && (
+            <div 
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0A0D12]/65 backdrop-blur-md"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setIsModalOpen(false);
+              }}
+            >
+              <div className="relative w-full max-w-md rounded-3xl bg-white text-[#252A34] p-7 shadow-2xl">
+                
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-sm font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+
+                {isSubmitted ? (
+                  <div className="py-8 text-center space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-[#16B8B0]/15 text-[#16B8B0] flex items-center justify-center mx-auto text-xl font-black">
+                      ✓
+                    </div>
+                    <h3 className="text-xl font-black text-[#163A5F]">
+                      ¡Cupo VIP Reservado!
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-600">
+                      Te enviaremos tu acceso gratuito a tu WhatsApp <strong>{formData.phone}</strong>.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setIsSubmitted(false);
+                        setIsModalOpen(false);
+                      }}
+                      className="mt-3 bg-[#0A0D12] text-white text-xs font-bold px-6 py-2.5 rounded-full cursor-pointer"
+                    >
+                      Listo
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[#16B8B0]">
+                      Acceso Anticipado • Cupos Limitados
+                    </span>
+                    <h3 className="text-xl font-black text-[#163A5F] mt-0.5 mb-4">
+                      Reserva tu Pase VIP Gratis
+                    </h3>
+
+                    {errorMessage && (
+                      <div className="mb-3 p-2.5 rounded-xl bg-red-50 text-red-600 text-xs font-bold text-center">
+                        {errorMessage}
+                      </div>
+                    )}
+
+                    <form onSubmit={handleSubmit} className="space-y-3">
+                      <input
+                        type="text"
+                        name="fullName"
+                        value={formData.fullName}
+                        onChange={handleChange}
+                        placeholder="Nombre y Apellido *"
+                        className="w-full bg-[#F5F8FA] text-sm rounded-xl px-3.5 py-2.5 border border-slate-200 focus:border-[#16B8B0] focus:outline-none"
+                        required
+                      />
+
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        placeholder="Celular / WhatsApp *"
+                        className="w-full bg-[#F5F8FA] text-sm rounded-xl px-3.5 py-2.5 border border-slate-200 focus:border-[#16B8B0] focus:outline-none"
+                        required
+                      />
+
+                      <input
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        placeholder="Correo electrónico *"
+                        className="w-full bg-[#F5F8FA] text-sm rounded-xl px-3.5 py-2.5 border border-slate-200 focus:border-[#16B8B0] focus:outline-none"
+                        required
+                      />
+
+                      <select
+                        name="serviceType"
+                        value={formData.serviceType}
+                        onChange={handleChange}
+                        className="w-full bg-[#F5F8FA] text-sm rounded-xl px-3.5 py-2.5 border border-slate-200 focus:border-[#16B8B0] focus:outline-none"
+                        required
+                      >
+                        <option value="" disabled>Rubro en Marketplace *</option>
+                        <option value="Inmobiliaria y Alquileres">Inmobiliaria y Alquileres</option>
+                        <option value="Calzado y Moda">Calzado y Moda</option>
+                        <option value="Vehículos y Repuestos">Vehículos y Repuestos</option>
+                        <option value="Tecnología y Gadgets">Tecnología y Gadgets</option>
+                        <option value="Multirubro / Dropshipping">Multirubro / Dropshipping</option>
+                        <option value="Financiamiento / Servicios">Financiamiento / Servicios</option>
+                        <option value="Otro">Otro</option>
+                      </select>
+
+                      <select
+                        name="dailyMessages"
+                        value={formData.dailyMessages}
+                        onChange={handleChange}
+                        className="w-full bg-[#F5F8FA] text-sm rounded-xl px-3.5 py-2.5 border border-slate-200 focus:border-[#16B8B0] focus:outline-none"
+                        required
+                      >
+                        <option value="Menos de 10 al día">Menos de 10 mensajes al día</option>
+                        <option value="Entre 10 y 50 al día">Entre 10 y 50 mensajes al día</option>
+                        <option value="Más de 50 al día">Más de 50 mensajes al día</option>
+                      </select>
+
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="w-full bg-[#0A0D12] hover:bg-[#163A5F] text-white font-bold text-sm py-3 rounded-full transition cursor-pointer mt-1"
+                      >
+                        {isSubmitting ? 'Guardando...' : 'Obtener Acceso VIP →'}
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

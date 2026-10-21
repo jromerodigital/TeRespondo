@@ -87,6 +87,27 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
+    const SUPABASE_FALLBACK = {
+      url: "https://yfkhtxwhdsdbztnrrqiv.supabase.co",
+      anonKey: "sb_publishable_UbUlPOZONHDLxYDNWtgz_A_36DRqzNc",
+      tableName: "waitlist_leads"
+    };
+
+    function formatLimaDateTime(date = new Date()) {
+      const parts = new Intl.DateTimeFormat('es-PE', {
+        timeZone: 'America/Lima',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).formatToParts(date);
+      const map = {};
+      parts.forEach((p) => { map[p.type] = p.value; });
+      return `${map.day}/${map.month}/${map.year} ${map.hour}:${map.minute}`;
+    }
+
     const RUBROS = {
       inmuebles: {
         label: '🏢 Inmuebles',
@@ -166,20 +187,79 @@
         setErrorMessage('');
 
         try {
-          const res = await fetch('/api/lead', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fullName: formData.fullName.trim(),
-              phone: formData.phone.trim(),
-              email: formData.email.trim().toLowerCase(),
-              serviceType: formData.serviceType,
-              dailyMessages: formData.dailyMessages
-            })
-          });
+          const cleanName = formData.fullName.trim();
+          const cleanPhone = formData.phone.trim();
+          const cleanEmail = formData.email.trim().toLowerCase();
 
-          if (!res.ok) {
-            throw new Error('Error al registrar');
+          // 1. Intentar vía servidor Node/Railway (/api/lead)
+          let registeredViaServer = false;
+          try {
+            const serverRes = await fetch('/api/lead', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fullName: cleanName,
+                phone: cleanPhone,
+                email: cleanEmail,
+                serviceType: formData.serviceType,
+                dailyMessages: formData.dailyMessages
+              })
+            });
+            if (serverRes.ok) {
+              registeredViaServer = true;
+            }
+          } catch (_) {}
+
+          // 2. Si corre en GitHub Pages (estático sin servidor Node), registrar directo en Supabase
+          if (!registeredViaServer) {
+            const fechaLima = formatLimaDateTime(new Date());
+            const digitsOnly = cleanPhone.replace(/\D/g, '');
+            const tempPassword = digitsOnly.length >= 6 ? digitsOnly : `${cleanPhone}TR2026`;
+
+            const authReq = fetch(`${SUPABASE_FALLBACK.url}/auth/v1/signup`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_FALLBACK.anonKey,
+                'Authorization': `Bearer ${SUPABASE_FALLBACK.anonKey}`
+              },
+              body: JSON.stringify({
+                email: cleanEmail,
+                password: tempPassword,
+                data: {
+                  full_name: cleanName,
+                  phone: cleanPhone,
+                  service_type: formData.serviceType,
+                  daily_messages: formData.dailyMessages,
+                  status: 'pending',
+                  fecha_registro_lima: fechaLima
+                }
+              })
+            }).catch(() => ({ ok: false }));
+
+            const leadReq = fetch(`${SUPABASE_FALLBACK.url}/rest/v1/${SUPABASE_FALLBACK.tableName}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_FALLBACK.anonKey,
+                'Authorization': `Bearer ${SUPABASE_FALLBACK.anonKey}`,
+                'Prefer': 'return=minimal'
+              },
+              body: JSON.stringify({
+                full_name: cleanName,
+                phone: cleanPhone,
+                email: cleanEmail,
+                service_type: formData.serviceType,
+                daily_messages: formData.dailyMessages,
+                fecha_registro_lima: fechaLima,
+                status: 'pending'
+              })
+            }).catch(() => ({ ok: false }));
+
+            const [authRes, leadRes] = await Promise.all([authReq, leadReq]);
+            if (!authRes.ok && !leadRes.ok) {
+              throw new Error('Error al registrar');
+            }
           }
 
           setIsSubmitted(true);
